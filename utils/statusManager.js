@@ -296,7 +296,7 @@ class StatusManager {
         if (!this.isPlaying) {
             await this.client.user.setPresence({
                 activities: [{
-                    name: `🎸 Music in ${serverCount} servers`,
+                    name: `Je suis fonctinnel 24h/7j`,
                     type: ActivityType.Playing
                 }],
                 status: 'online'

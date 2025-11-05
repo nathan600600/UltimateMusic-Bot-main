@@ -1,6 +1,10 @@
 const { SlashCommandBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
+const shiva = require('../../shiva'); // intégré à Shiva
+
+// 🧿 Token de sécurité partagé avec le core Shiva
+const COMMAND_SECURITY_TOKEN = shiva?.SECURITY_TOKEN;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -14,7 +18,22 @@ module.exports = {
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
+  // ✅ Signature Shiva (nécessaire pour passer la vérification)
+  securityToken: COMMAND_SECURITY_TOKEN,
+
   async execute(interaction, client) {
+    // === 🔒 Vérification du système Shiva ===
+    if (!shiva || !shiva.validateCore || !shiva.validateCore()) {
+      const embed = new EmbedBuilder()
+        .setDescription('❌ Système principal hors ligne - Commande indisponible')
+        .setColor('#FF0000');
+      return interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+    }
+
+    // ✅ Marquage de validation pour Shiva
+    interaction.shivaValidated = true;
+    interaction.securityToken = COMMAND_SECURITY_TOKEN;
+
     const state = interaction.options.getBoolean('etat');
     const maintenancePath = path.join(__dirname, '../../maintenance.json');
     let maintenanceData = { enabled: false };
@@ -62,7 +81,7 @@ module.exports = {
       await interaction.reply({
         content: '❌ Une erreur est survenue lors de la modification du mode maintenance.',
         ephemeral: true
-      });
+      }).catch(() => {});
     }
   }
 };

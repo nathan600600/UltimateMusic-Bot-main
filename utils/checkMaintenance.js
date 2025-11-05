@@ -1,19 +1,38 @@
 const fs = require('fs');
 const path = require('path');
-const configPath = path.join(__dirname, '../config.json');
 
-function checkMaintenance(interaction) {
-  const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-  
-  if (config.maintenance === true) {
-    interaction.reply({
-      content: '🛠️ Le bot est en maintenance. Réessaie plus tard.',
-      ephemeral: true
-    });
-    return true;
-  }
+const maintenanceFile = path.join(__dirname, '../maintenance.json');
 
-  return false;
+function isMaintenanceMode() {
+    try {
+        if (!fs.existsSync(maintenanceFile)) return false;
+        const data = JSON.parse(fs.readFileSync(maintenanceFile, 'utf8'));
+        return data.enabled === true;
+    } catch {
+        return false;
+    }
 }
 
-module.exports = checkMaintenance;
+// ✅ Version fixée du checkMaintenance
+async function checkMaintenance(interactionOrMessage) {
+    const maintenance = isMaintenanceMode();
+    if (!maintenance) return false; // Ne rien faire si maintenance désactivée
+
+    const admins = (process.env.ADMINS || '').split(',').map(x => x.trim());
+    const userId = interactionOrMessage.user?.id || interactionOrMessage.author?.id;
+    const isAdmin = admins.includes(userId);
+
+    if (isAdmin) return false; // les admins passent quand même
+
+    const msg = '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !';
+
+    if (interactionOrMessage.isRepliable?.()) {
+        await interactionOrMessage.reply({ content: msg, ephemeral: true }).catch(() => {});
+    } else if (interactionOrMessage.reply) {
+        await interactionOrMessage.reply(msg).catch(() => {});
+    }
+
+    return true; // Seulement maintenant on renvoie true
+}
+
+module.exports = { checkMaintenance, isMaintenanceMode };

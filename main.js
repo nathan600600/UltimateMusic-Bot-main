@@ -20,62 +20,6 @@ const ApplicationStatusManagementService = require('./utils/statusManager');
 const MemoryGarbageCollectionOptimizer = require('./utils/garbageCollector');
 const EnvironmentVariableConfigurationLoader = require('dotenv');
 const shiva = require('./shiva');
-
-// === MAINTENANCE SYSTEM (ajout) =========================
-const MaintenanceStateFilePath = SystemPathResolutionUtility.join(__dirname, 'maintenance.json');
-let MaintenanceState = { enabled: false };
-
-try {
-    if (FileSystemOperationalInterface.existsSync(MaintenanceStateFilePath)) {
-        MaintenanceState = JSON.parse(
-            FileSystemOperationalInterface.readFileSync(MaintenanceStateFilePath, 'utf8')
-        );
-    }
-} catch (e) {
-    console.error('❌ Failed to read maintenance.json:', e.message);
-}
-
-const MAINT_ADMINS = (process.env.ADMINS || '').split(',').map(s => s.trim()).filter(Boolean);
-
-function isPrivileged(member, user) {
-    if (!member && !user) return false;
-
-    // Vérifie permissions serveur
-    if (member?.permissions?.has?.('Administrator')) return true;
-
-    // Vérifie si l'utilisateur fait partie des admins définis dans .env
-    if (MAINT_ADMINS.includes(user?.id || member?.id)) return true;
-
-    return false;
-}
-
-async function replyMaintenanceIfNeededFromInteraction(interaction) {
-    try {
-        if (!MaintenanceState.enabled) return false;
-        if (isPrivileged(interaction.member)) return false;
-
-        if (interaction.isRepliable?.()) {
-            await interaction.reply({
-                content: '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !',
-                ephemeral: true
-            }).catch(() => {});
-        }
-        return true;
-    } catch (_) { return true; }
-}
-
-async function replyMaintenanceIfNeededFromMessage(message) {
-    try {
-        if (!MaintenanceState.enabled) return false;
-        if (isPrivileged(message.member)) return false;
-        if (message.author?.bot) return true;
-
-        await message.reply('🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !').catch(() => {});
-        return true;
-    } catch (_) { return true; }
-}
-// =========================================================
-
 // Initialize environment variable configuration subsystem
 EnvironmentVariableConfigurationLoader.config();
 
@@ -265,66 +209,15 @@ class ApplicationBootstrapOrchestrator {
         //console.log('🎵 Player events initialized');
     }
     
-/**
- * Execute Discord client authentication and connectivity establishment
- */
-async executeClientAuthenticationProcedure() {
-    const authenticationCredential = SystemConfigurationManager.discord.token || process.env.TOKEN;
-
-    await this.clientRuntimeInstance.login(authenticationCredential);
-
-    // Assure que le bot est bien connecté avant d’enregistrer les gardes
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log("✅ Bot connecté, gardes maintenance activés !");
-
-    // === MAINTENANCE ↔ STATUT ===
-    await this.clientRuntimeInstance.statusManager.updateGlobalStatus();
-
-    // === INTERCEPTION GLOBALE DES COMMANDES PENDANT LA MAINTENANCE ===
-    // Utiliser prependListener pour être prioritaire sur tous les handlers
-    this.clientRuntimeInstance.prependListener('interactionCreate', async (interaction) => {
-        try {
-            console.log("🧩 Maintenance check — enabled:", MaintenanceState.enabled);
-            if (interaction.user?.bot) return;
-
-            // Si maintenance activée → bloquer toutes les commandes (sauf admins)
-            if (MaintenanceState.enabled && !isPrivileged(interaction.member, interaction.user)) {
-                try {
-                    if (interaction.isRepliable()) {
-                        await interaction.reply({
-                            content: '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !',
-                            ephemeral: true
-                        });
-                    } else {
-                        await interaction.followUp({
-                            content: '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !',
-                            ephemeral: true
-                        });
-                    }
-                } catch (e) {
-                    console.warn('Maintenance intercept (interaction):', e.message);
-                }
-                return; // bloque l’exécution des handlers suivants
-            }
-        } catch (e) {
-            console.error('Maintenance global guard failed:', e);
-        }
-    });
-
-    // === Garde aussi les commandes message
-    this.clientRuntimeInstance.prependListener('messageCreate', async (message) => {
-        try {
-            if (message.author?.bot) return;
-            if (MaintenanceState.enabled && !isPrivileged(interaction.member, interaction.user)) {
-                await message.reply('🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !').catch(() => {});
-                return; // bloque les events messageCreate du bot
-            }
-        } catch (e) {
-            console.error('Maintenance global guard (message):', e);
-        }
-    });
-}
-
+    /**
+     * Execute Discord client authentication and connectivity establishment
+     */
+    async executeClientAuthenticationProcedure() {
+        const authenticationCredential = SystemConfigurationManager.discord.token || 
+                                       process.env.TOKEN;
+        
+        await this.clientRuntimeInstance.login(authenticationCredential);
+    }
 }
 
 /**
@@ -412,37 +305,21 @@ class EventHandlerRegistrationService {
      * Bind discovered event handlers with advanced lifecycle management
      */
     bindEventHandlers(clientInstance) {
-     for (const eventHandlerInstance of this.discoveredEventHandlers) {
-        const wrappedHandler = async (...eventArguments) => {
-            try {
-                if (eventHandlerInstance.name === 'interactionCreate') {
-                    const interaction = eventArguments[0];
-                    const blocked = await replyMaintenanceIfNeededFromInteraction(interaction);
-                    if (blocked) return;
-                } else if (eventHandlerInstance.name === 'messageCreate') {
-                    const message = eventArguments[0];
-                    const blocked = await replyMaintenanceIfNeededFromMessage(message);
-                    if (blocked) return;
-                }
-                return eventHandlerInstance.execute(...eventArguments, clientInstance);
-            } catch (err) {
-                try {
-                    return eventHandlerInstance.execute(...eventArguments, clientInstance);
-                } catch (_) {}
+        for (const eventHandlerInstance of this.discoveredEventHandlers) {
+            if (eventHandlerInstance.once) {
+                clientInstance.once(eventHandlerInstance.name, (...eventArguments) => 
+                    eventHandlerInstance.execute(...eventArguments, clientInstance));
+            } else {
+                clientInstance.on(eventHandlerInstance.name, (...eventArguments) => 
+                    eventHandlerInstance.execute(...eventArguments, clientInstance));
             }
-        };
-
-        if (eventHandlerInstance.once) {
-            clientInstance.once(eventHandlerInstance.name, wrappedHandler);
-        } else {
-            clientInstance.prependListener(eventHandlerInstance.name, wrappedHandler);
+            this.boundEventHandlers++;
         }
-        this.boundEventHandlers++;
+        
+        return {
+            totalEvents: this.boundEventHandlers
+        };
     }
-
-    return { totalEvents: this.boundEventHandlers };
-}
-
 }
 
 /**
@@ -495,25 +372,6 @@ class AudioSubsystemIntegrationManager {
 const enterpriseApplicationManager = new DiscordClientRuntimeManager();
 enterpriseApplicationManager.executeApplicationBootstrap();
 
-// === Setter maintenance pour les commandes admin ===
-enterpriseApplicationManager.clientRuntimeInstance.setMaintenanceEnabled = async (enabled) => {
-    try {
-        MaintenanceState.enabled = !!enabled;
-
-        // Met à jour le fichier JSON pour persistance
-        FileSystemOperationalInterface.writeFileSync(
-            MaintenanceStateFilePath,
-            JSON.stringify({ enabled: !!enabled }, null, 2)
-        );
-
-        // Met à jour le statut du bot via StatusManager
-        await enterpriseApplicationManager.clientRuntimeInstance.statusManager.updateGlobalStatus();
-
-        console.log(`🧰 Mode maintenance ${enabled ? 'activé' : 'désactivé'}.`);
-    } catch (err) {
-        console.error('❌ Impossible de mettre à jour le mode maintenance :', err);
-    }
-};
 
 module.exports = enterpriseApplicationManager.clientRuntimeInstance;
 shiva.initialize(enterpriseApplicationManager.clientRuntimeInstance);

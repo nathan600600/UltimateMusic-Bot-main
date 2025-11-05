@@ -35,92 +35,61 @@ class PlayerHandler {
     }
 
     async playSong(player, query, requester) {
-    try {
-        if (!player) return { type: 'error', message: 'Player not available' };
+        try {
+            if (!player) return { type: 'error', message: 'Player not available' };
 
-        // === Vérifie la connexion Lavalink avant de continuer ===
-        const nodes = this.client.riffy.nodes;
-const nodeList = Array.isArray(nodes)
-    ? nodes
-    : typeof nodes === 'object'
-        ? Object.values(nodes)
-        : [];
+            const resolve = await this.client.riffy.resolve({ 
+                query: query, 
+                requester: requester 
+            });
 
-const node = nodeList[0];
-if (!node || !node.connected) {
-    console.warn('⚠️ Aucun node Lavalink disponible — tentative de reconnexion...');
-    await new Promise(res => setTimeout(res, 3000));
+            const { loadType, tracks, playlistInfo } = resolve;
 
-    const refreshedNodes = typeof this.client.riffy.nodes === 'object'
-        ? Object.values(this.client.riffy.nodes)
-        : [];
-
-    if (!refreshedNodes.length || !refreshedNodes[0]?.connected) {
-        return {
-            type: 'error',
-            message: '⚠️ Aucun serveur audio disponible. Réessaie dans quelques secondes !'
-        };
-    }
-}
-
-        // === Recherche du morceau ===
-        const resolve = await this.client.riffy.resolve({
-            query: query,
-            requester: requester
-        });
-
-        if (!resolve) {
-            return { type: 'error', message: '❌ Impossible de résoudre la requête musicale.' };
-        }
-
-        const { loadType, tracks, playlistInfo } = resolve;
-
-        if (loadType === 'playlist') {
-            for (const track of tracks) {
-                if (track && track.info) {
-                    track.info.requester = requester;
-                    player.queue.add(track);
+            if (loadType === 'playlist') {
+                for (const track of tracks) {
+                    if (track && track.info) {
+                        track.info.requester = requester;
+                        player.queue.add(track);
+                    }
                 }
+
+                if (!player.playing && !player.paused) {
+                    await player.play();
+                }
+
+                return {
+                    type: 'playlist',
+                    tracks: tracks.length,
+                    name: playlistInfo?.name || 'Unknown Playlist'
+                };
+
+            } else if (loadType === 'search' || loadType === 'track') {
+                const track = tracks[0];
+                if (!track || !track.info) {
+                    return { type: 'error', message: 'No results found' };
+                }
+
+                track.info.requester = requester;
+                player.queue.add(track);
+
+                if (!player.playing && !player.paused) {
+                    await player.play();
+                }
+
+                return {
+                    type: 'track',
+                    track: track
+                };
+
+            } else {
+                return { type: 'error', message: 'No results found' };
             }
 
-            if (!player.playing && !player.paused) {
-                await player.play();
-            }
-
-            return {
-                type: 'playlist',
-                tracks: tracks.length,
-                name: playlistInfo?.name || 'Unknown Playlist'
-            };
-
-        } else if (loadType === 'search' || loadType === 'track') {
-            const track = tracks[0];
-            if (!track || !track.info) {
-                return { type: 'error', message: 'Aucun résultat trouvé pour ta recherche.' };
-            }
-
-            track.info.requester = requester;
-            player.queue.add(track);
-
-            if (!player.playing && !player.paused) {
-                await player.play();
-            }
-
-            return {
-                type: 'track',
-                track: track
-            };
-
-        } else {
-            return { type: 'error', message: 'Aucun résultat trouvé pour cette requête.' };
+        } catch (error) {
+            console.error('Play song error:', error.message);
+            return { type: 'error', message: 'Failed to play song' };
         }
-
-    } catch (error) {
-        console.error('❌ Play song error:', error);
-        return { type: 'error', message: 'Une erreur est survenue lors de la lecture.' };
     }
-}
-
 
     getPlayerInfo(guildId) {
         try {

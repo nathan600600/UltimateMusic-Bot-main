@@ -130,8 +130,22 @@ module.exports = {
         // Vérification du mode maintenance pour Loïc
         if (typeof checkMaintenance === 'function') {
           if (await checkMaintenance(message)) {
-            const maintenanceMsg = await message.reply('🛠️ Loïc est actuellement en maintenance. Réessaie plus tard !').catch(() => {});
-            if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 10000);
+            const maintenanceContent = '🛠️ Loïc est actuellement en maintenance. Réessaie plus tard !';
+            try {
+              const recent = await message.channel.messages.fetch({ limit: 8 });
+              const duplicate = recent.find(m => m.author.id === client.user.id && m.content === maintenanceContent);
+              if (!duplicate) {
+                const maintenanceMsg = await message.reply(maintenanceContent).catch(() => {});
+                if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 5000);
+              }
+            } catch (e) {
+              const maintenanceMsg = await message.reply(maintenanceContent).catch(() => {});
+              if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 5000);
+            }
+            // Supprime aussi le message de l'utilisateur après 10s (si possible)
+            setTimeout(() => {
+              message.delete().catch(() => {});
+            }, 5000);
             return;
           }
         }
@@ -164,8 +178,26 @@ module.exports = {
         const reply = data.choices?.[0]?.message?.content;
         if (reply) {
           history.push({ role: 'assistant', content: reply });
-          const sent = await message.reply({ content: reply, allowedMentions: { repliedUser: true } }).catch(() => {});
-          if (sent) setTimeout(() => sent.delete().catch(() => {}), 10000);
+          const replyContent = reply.toString();
+          try {
+            const recent = await message.channel.messages.fetch({ limit: 8 });
+            const duplicate = recent.find(m => m.author.id === client.user.id && m.content === replyContent);
+            if (!duplicate) {
+              const sent = await message.reply({ content: replyContent, allowedMentions: { repliedUser: true } }).catch(() => {});
+              if (sent) setTimeout(() => sent.delete().catch(() => {}), 10000);
+              // Supprime aussi le message de l'utilisateur après 10s (si possible)
+              setTimeout(() => {
+                message.delete().catch(() => {});
+              }, 10000);
+            }
+          } catch (e) {
+            const sent = await message.reply({ content: replyContent, allowedMentions: { repliedUser: true } }).catch(() => {});
+            if (sent) setTimeout(() => sent.delete().catch(() => {}), 10000);
+            // Supprime aussi le message de l'utilisateur après 10s (si possible)
+            setTimeout(() => {
+              message.delete().catch(() => {});
+            }, 10000);
+          }
         }
         return;
       }

@@ -2,6 +2,7 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const GarbageCollector = require('../../utils/garbageCollector');
 const config = require('../../config');
 const shiva = require('../../shiva');
+const { checkMaintenance } = require('../../utils/maintenance'); // <-- ajouté
 
 const COMMAND_SECURITY_TOKEN = shiva.SECURITY_TOKEN;
 
@@ -23,6 +24,11 @@ module.exports = {
         interaction.shivaValidated = true;
         interaction.securityToken = COMMAND_SECURITY_TOKEN;
 
+        // ✅ Vérification du mode maintenance (si utilitaire présent)
+        if (typeof checkMaintenance === 'function') {
+            if (await checkMaintenance(interaction)) return;
+        }
+        
         if (!config.bot.ownerIds.includes(interaction.user.id)) {
             return interaction.reply({
                 content: '❌ Only bot owners can use this command!',

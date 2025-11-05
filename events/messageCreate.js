@@ -130,25 +130,12 @@ module.exports = {
         // Vérification du mode maintenance pour Loïc
         if (typeof checkMaintenance === 'function') {
           if (await checkMaintenance(message)) {
-            const maintenanceContent = '🛠️ Loïc est actuellement en maintenance. Réessaie plus tard !';
-            try {
-              const recent = await message.channel.messages.fetch({ limit: 8 });
-              const duplicate = recent.find(m => m.author.id === client.user.id && m.content === maintenanceContent);
-              if (!duplicate) {
-                const maintenanceMsg = await message.reply(maintenanceContent).catch(() => {});
-                if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 5000);
-              }
-            } catch (e) {
-              const maintenanceMsg = await message.reply(maintenanceContent).catch(() => {});
-              if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 5000);
-            }
-            // Supprime aussi le message de l'utilisateur après 10s (si possible)
             setTimeout(() => {
-              message.delete().catch(() => {});
-            }, 5000);
-            return;
-          }
-        }
+            message.delete().catch(() => {});
+        }, 5000);
+        return; // stop ici → ne continue pas
+      }
+    }
 
         const userId = message.author.id;
         if (!memory.has(userId)) memory.set(userId, []);

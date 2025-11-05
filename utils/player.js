@@ -39,18 +39,29 @@ class PlayerHandler {
         if (!player) return { type: 'error', message: 'Player not available' };
 
         // === Vérifie la connexion Lavalink avant de continuer ===
-        const node = this.client.riffy.nodes.first();
-        if (!node || !node.connected) {
-            console.warn('⚠️ Aucun node Lavalink disponible — tentative de reconnexion...');
-            await new Promise(res => setTimeout(res, 3000));
+        const nodes = this.client.riffy.nodes;
+const nodeList = Array.isArray(nodes)
+    ? nodes
+    : typeof nodes === 'object'
+        ? Object.values(nodes)
+        : [];
 
-            if (!this.client.riffy.nodes.size || !this.client.riffy.nodes.first()?.connected) {
-                return {
-                    type: 'error',
-                    message: '⚠️ Aucun serveur audio disponible. Réessaie dans quelques secondes !'
-                };
-            }
-        }
+const node = nodeList[0];
+if (!node || !node.connected) {
+    console.warn('⚠️ Aucun node Lavalink disponible — tentative de reconnexion...');
+    await new Promise(res => setTimeout(res, 3000));
+
+    const refreshedNodes = typeof this.client.riffy.nodes === 'object'
+        ? Object.values(this.client.riffy.nodes)
+        : [];
+
+    if (!refreshedNodes.length || !refreshedNodes[0]?.connected) {
+        return {
+            type: 'error',
+            message: '⚠️ Aucun serveur audio disponible. Réessaie dans quelques secondes !'
+        };
+    }
+}
 
         // === Recherche du morceau ===
         const resolve = await this.client.riffy.resolve({

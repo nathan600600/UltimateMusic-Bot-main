@@ -37,10 +37,15 @@ try {
 
 const MAINT_ADMINS = (process.env.ADMINS || '').split(',').map(s => s.trim()).filter(Boolean);
 
-function isPrivileged(member) {
-    if (!member) return false;
-    if (member.permissions?.has?.('Administrator')) return true;
-    if (MAINT_ADMINS.includes(member.id)) return true;
+function isPrivileged(member, user) {
+    if (!member && !user) return false;
+
+    // Vérifie permissions serveur
+    if (member?.permissions?.has?.('Administrator')) return true;
+
+    // Vérifie si l'utilisateur fait partie des admins définis dans .env
+    if (MAINT_ADMINS.includes(user?.id || member?.id)) return true;
+
     return false;
 }
 
@@ -268,6 +273,10 @@ async executeClientAuthenticationProcedure() {
 
     await this.clientRuntimeInstance.login(authenticationCredential);
 
+    // Assure que le bot est bien connecté avant d’enregistrer les gardes
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log("✅ Bot connecté, gardes maintenance activés !");
+
     // === MAINTENANCE ↔ STATUT ===
     await this.clientRuntimeInstance.statusManager.updateGlobalStatus();
 
@@ -275,10 +284,11 @@ async executeClientAuthenticationProcedure() {
     // Utiliser prependListener pour être prioritaire sur tous les handlers
     this.clientRuntimeInstance.prependListener('interactionCreate', async (interaction) => {
         try {
+            console.log("🧩 Maintenance check — enabled:", MaintenanceState.enabled);
             if (interaction.user?.bot) return;
 
             // Si maintenance activée → bloquer toutes les commandes (sauf admins)
-            if (MaintenanceState.enabled && !isPrivileged(interaction.member)) {
+            if (MaintenanceState.enabled && !isPrivileged(interaction.member, interaction.user)) {
                 try {
                     if (interaction.isRepliable()) {
                         await interaction.reply({
@@ -305,7 +315,7 @@ async executeClientAuthenticationProcedure() {
     this.clientRuntimeInstance.prependListener('messageCreate', async (message) => {
         try {
             if (message.author?.bot) return;
-            if (MaintenanceState.enabled && !isPrivileged(message.member)) {
+            if (MaintenanceState.enabled && !isPrivileged(interaction.member, interaction.user)) {
                 await message.reply('🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !').catch(() => {});
                 return; // bloque les events messageCreate du bot
             }

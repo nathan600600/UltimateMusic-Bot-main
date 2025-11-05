@@ -1,8 +1,15 @@
 const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const shiva = require('../../shiva');
 
+let checkMaintenance = null;
+try {
+  checkMaintenance = require('../../utils/maintenance').checkMaintenance;
+} catch (e) {
+  checkMaintenance = null;
+}
+
 // 🧿 Token de sécurité partagé avec le core Shiva
-const COMMAND_SECURITY_TOKEN = shiva.SECURITY_TOKEN;
+const COMMAND_SECURITY_TOKEN = shiva?.SECURITY_TOKEN;
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,6 +44,11 @@ module.exports = {
     // ✅ Marquage de validation
     interaction.shivaValidated = true;
     interaction.securityToken = COMMAND_SECURITY_TOKEN;
+
+    // Vérification du mode maintenance si l'utilitaire existe
+    if (typeof checkMaintenance === 'function') {
+      if (await checkMaintenance(interaction)) return;
+    }
 
     // === ⚙️ Récupération du paramètre ===
     const nombre = interaction.options.getInteger('nombre');

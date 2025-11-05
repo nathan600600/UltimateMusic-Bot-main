@@ -1,7 +1,14 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 const shiva = require('../../shiva');
 
-const COMMAND_SECURITY_TOKEN = shiva.SECURITY_TOKEN;
+let checkMaintenance = null;
+try {
+  checkMaintenance = require('../../utils/maintenance').checkMaintenance;
+} catch (e) {
+  checkMaintenance = null;
+}
+
+const COMMAND_SECURITY_TOKEN = shiva?.SECURITY_TOKEN;
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -19,6 +26,11 @@ module.exports = {
 
         interaction.shivaValidated = true;
         interaction.securityToken = COMMAND_SECURITY_TOKEN;
+
+        // Vérification du mode maintenance si l'utilitaire existe
+        if (typeof checkMaintenance === 'function') {
+            if (await checkMaintenance(interaction)) return;
+        }
 
         await interaction.deferReply();
 

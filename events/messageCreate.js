@@ -4,6 +4,13 @@ const { EmbedBuilder } = require('discord.js');
 const shiva = require('../shiva');
 const fetch = (...args) => import('node-fetch').then(({ default: fetch }) => fetch(...args));
 
+let checkMaintenance = null;
+try {
+  checkMaintenance = require('../utils/maintenance').checkMaintenance;
+} catch (e) {
+  checkMaintenance = null;
+}
+
 const userCooldowns = new Map();
 const SPAM_THRESHOLD = 3;
 const COOLDOWN_TIME = 5000;
@@ -119,6 +126,16 @@ module.exports = {
     try {
       const salonID = '1384193403033747648'; // ⚙️ ton salon Loïc
       if (message.channel.id === salonID) {
+
+        // Vérification du mode maintenance pour Loïc
+        if (typeof checkMaintenance === 'function') {
+          if (await checkMaintenance(message)) {
+            const maintenanceMsg = await message.reply('🛠️ Loïc est actuellement en maintenance. Réessaie plus tard !').catch(() => {});
+            if (maintenanceMsg) setTimeout(() => maintenanceMsg.delete().catch(() => {}), 10000);
+            return;
+          }
+        }
+
         const userId = message.author.id;
         if (!memory.has(userId)) memory.set(userId, []);
         const history = memory.get(userId);
@@ -147,7 +164,8 @@ module.exports = {
         const reply = data.choices?.[0]?.message?.content;
         if (reply) {
           history.push({ role: 'assistant', content: reply });
-          await message.reply({ content: reply, allowedMentions: { repliedUser: true } });
+          const sent = await message.reply({ content: reply, allowedMentions: { repliedUser: true } }).catch(() => {});
+          if (sent) setTimeout(() => sent.delete().catch(() => {}), 10000);
         }
         return;
       }

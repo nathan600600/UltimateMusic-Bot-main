@@ -3,36 +3,37 @@ const path = require('path');
 
 const maintenanceFile = path.join(__dirname, '../maintenance.json');
 
-function isMaintenanceMode() {
-    try {
-        if (!fs.existsSync(maintenanceFile)) return false;
-        const data = JSON.parse(fs.readFileSync(maintenanceFile, 'utf8'));
-        return data.enabled === true;
-    } catch {
-        return false;
-    }
+function isMaintenanceEnabled() {
+  try {
+    if (!fs.existsSync(maintenanceFile)) return false;
+    const data = JSON.parse(fs.readFileSync(maintenanceFile, 'utf8'));
+    return data.enabled === true;
+  } catch {
+    return false;
+  }
 }
 
-// ✅ Version fixée du checkMaintenance
-async function checkMaintenance(interactionOrMessage) {
-    const maintenance = isMaintenanceMode();
-    if (!maintenance) return false; // Ne rien faire si maintenance désactivée
+async function checkMaintenance(message) {
+  // Vérifie le fichier JSON
+  const maintenance = isMaintenanceEnabled();
+  if (!maintenance) return false; // <-- IMPORTANT : ne bloque pas si désactivé
 
-    const admins = (process.env.ADMINS || '').split(',').map(x => x.trim());
-    const userId = interactionOrMessage.user?.id || interactionOrMessage.author?.id;
-    const isAdmin = admins.includes(userId);
+  // Vérifie si utilisateur est admin (facultatif)
+  const admins = (process.env.ADMINS || '').split(',').map(x => x.trim());
+  const userId = message.author?.id;
+  if (admins.includes(userId)) return false;
 
-    if (isAdmin) return false; // les admins passent quand même
+  // Envoie le message de maintenance
+  const content = '🛠️ Loïc est actuellement en maintenance. Réessaie plus tard !';
+  try {
+    const recent = await message.channel.messages.fetch({ limit: 8 });
+    const duplicate = recent.find(m => m.author.id === message.client.user.id && m.content === content);
+    if (!duplicate) await message.reply(content).catch(() => {});
+  } catch {
+    await message.reply(content).catch(() => {});
+  }
 
-    const msg = '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !';
-
-    if (interactionOrMessage.isRepliable?.()) {
-        await interactionOrMessage.reply({ content: msg, ephemeral: true }).catch(() => {});
-    } else if (interactionOrMessage.reply) {
-        await interactionOrMessage.reply(msg).catch(() => {});
-    }
-
-    return true; // Seulement maintenant on renvoie true
+  return true; // <-- Seulement maintenant on renvoie true
 }
 
-module.exports = { checkMaintenance, isMaintenanceMode };
+module.exports = { checkMaintenance, isMaintenanceEnabled };

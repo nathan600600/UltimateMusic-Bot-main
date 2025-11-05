@@ -37,7 +37,9 @@ module.exports = {
         const PlayerHandler = require('../../utils/player');
         const ErrorHandler = require('../../utils/errorHandler');
         
-        const query = interaction.options.getString('query');
+        // input = la chaîne fournie par l'utilisateur (args.join(' ') ou option)
+        const isUrl = /^(https?:\/\/|www\.)\S+$/i.test(input);
+        const query = isUrl ? input : `ytsearch:${input}`;
 
         try {
             const checker = new ConditionChecker(client);
@@ -61,20 +63,24 @@ module.exports = {
                 interaction.channel.id
             );
 
-            const result = await playerHandler.playSong(player, query, interaction.user);
+            // Exemple générique : si tu utilises une lib qui expose player.search/load
+            // (adapte selon ton player : player.search(), manager.search(), player.node.load(), etc.)
+            const res = await player.search(query, { requester: interaction.user }).catch(() => null);
+            if (!res || res.loadType === 'NO_MATCHES') {
+                return interaction.editReply({ content: '❌ Aucun résultat trouvé pour ta requête.' });
+            }
 
-            if (result.type === 'track') {
-                const embed = new EmbedBuilder().setDescription(`✅ Ajouté à la file d'attente : **${result.track.info.title}**`);
-                return interaction.editReply({ embeds: [embed] })
-                    .then(() => setTimeout(() => interaction.deleteReply().catch(() => {}), 3000));
-            } else if (result.type === 'playlist') {
-                const embed = new EmbedBuilder().setDescription(`✅ Ajouté **${result.tracks}** chansons de la playlist : **${result.name}**`);
-                return interaction.editReply({ embeds: [embed] })
-                    .then(() => setTimeout(() => interaction.deleteReply().catch(() => {}), 3000));
-            } else {
-                const embed = new EmbedBuilder().setDescription('❌ Aucun résultat trouvé pour votre requête !');
-                return interaction.editReply({ embeds: [embed] })
-                    .then(() => setTimeout(() => interaction.deleteReply().catch(() => {}), 3000));
+            if (res.loadType === 'TRACK_LOADED' || res.loadType === 'SEARCH_RESULT') {
+                const track = res.tracks[0];
+                player.queue.add(track);
+                // play if not already playing...
+                return interaction.editReply({ content: `✅ Ajouté : **${track.title}**` });
+            }
+
+            if (res.loadType === 'PLAYLIST_LOADED') {
+                // ajouter playlist
+                player.queue.add(...res.tracks);
+                return interaction.editReply({ content: `✅ Playlist ajoutée : **${res.playlist.name}**` });
             }
 
         } catch (error) {

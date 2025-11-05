@@ -35,61 +35,81 @@ class PlayerHandler {
     }
 
     async playSong(player, query, requester) {
-        try {
-            if (!player) return { type: 'error', message: 'Player not available' };
+    try {
+        if (!player) return { type: 'error', message: 'Player not available' };
 
-            const resolve = await this.client.riffy.resolve({ 
-                query: query, 
-                requester: requester 
-            });
+        // === Vérifie la connexion Lavalink avant de continuer ===
+        const node = this.client.riffy.nodes.first();
+        if (!node || !node.connected) {
+            console.warn('⚠️ Aucun node Lavalink disponible — tentative de reconnexion...');
+            await new Promise(res => setTimeout(res, 3000));
 
-            const { loadType, tracks, playlistInfo } = resolve;
-
-            if (loadType === 'playlist') {
-                for (const track of tracks) {
-                    if (track && track.info) {
-                        track.info.requester = requester;
-                        player.queue.add(track);
-                    }
-                }
-
-                if (!player.playing && !player.paused) {
-                    await player.play();
-                }
-
+            if (!this.client.riffy.nodes.size || !this.client.riffy.nodes.first()?.connected) {
                 return {
-                    type: 'playlist',
-                    tracks: tracks.length,
-                    name: playlistInfo?.name || 'Unknown Playlist'
+                    type: 'error',
+                    message: '⚠️ Aucun serveur audio disponible. Réessaie dans quelques secondes !'
                 };
+            }
+        }
 
-            } else if (loadType === 'search' || loadType === 'track') {
-                const track = tracks[0];
-                if (!track || !track.info) {
-                    return { type: 'error', message: 'No results found' };
+        // === Recherche du morceau ===
+        const resolve = await this.client.riffy.resolve({
+            query: query,
+            requester: requester
+        });
+
+        if (!resolve) {
+            return { type: 'error', message: '❌ Impossible de résoudre la requête musicale.' };
+        }
+
+        const { loadType, tracks, playlistInfo } = resolve;
+
+        if (loadType === 'playlist') {
+            for (const track of tracks) {
+                if (track && track.info) {
+                    track.info.requester = requester;
+                    player.queue.add(track);
                 }
-
-                track.info.requester = requester;
-                player.queue.add(track);
-
-                if (!player.playing && !player.paused) {
-                    await player.play();
-                }
-
-                return {
-                    type: 'track',
-                    track: track
-                };
-
-            } else {
-                return { type: 'error', message: 'No results found' };
             }
 
-        } catch (error) {
-            console.error('Play song error:', error.message);
-            return { type: 'error', message: 'Failed to play song' };
+            if (!player.playing && !player.paused) {
+                await player.play();
+            }
+
+            return {
+                type: 'playlist',
+                tracks: tracks.length,
+                name: playlistInfo?.name || 'Unknown Playlist'
+            };
+
+        } else if (loadType === 'search' || loadType === 'track') {
+            const track = tracks[0];
+            if (!track || !track.info) {
+                return { type: 'error', message: 'Aucun résultat trouvé pour ta recherche.' };
+            }
+
+            track.info.requester = requester;
+            player.queue.add(track);
+
+            if (!player.playing && !player.paused) {
+                await player.play();
+            }
+
+            return {
+                type: 'track',
+                track: track
+            };
+
+        } else {
+            return { type: 'error', message: 'Aucun résultat trouvé pour cette requête.' };
         }
+
+    } catch (error) {
+        console.error('❌ Play song error:', error);
+        return { type: 'error', message: 'Une erreur est survenue lors de la lecture.' };
     }
+}
+
 
     getPlayerInfo(guildId) {
         try {

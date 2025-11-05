@@ -270,7 +270,29 @@ class ApplicationBootstrapOrchestrator {
         await this.clientRuntimeInstance.login(authenticationCredential);
         // === MAINTENANCE ↔ STATUT ===
 await this.clientRuntimeInstance.statusManager.updateGlobalStatus();
+// === INTERCEPTION GLOBALE DES COMMANDES PENDANT LA MAINTENANCE ===
+this.clientRuntimeInstance.on('interactionCreate', async (interaction) => {
+    // Ignore les interactions de bots
+    if (interaction.user?.bot) return;
 
+    // Si maintenance activée → bloquer toutes les commandes
+    if (MaintenanceState.enabled && !isPrivileged(interaction.member)) {
+        try {
+            await interaction.reply({
+                content: '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !',
+                ephemeral: true
+            });
+        } catch {
+            try {
+                await interaction.followUp({
+                    content: '🛠️ Le bot est actuellement en maintenance. Réessaie plus tard !',
+                    ephemeral: true
+                });
+            } catch (_) {}
+        }
+        return; // On ne continue pas vers le handler
+    }
+});
     }
 }
 

@@ -24,7 +24,7 @@ class StatusManager {
                 await this.clearVoiceChannelStatus(guildId);
             }
         } catch (error) {
-            console.error('❌ Error updating status and voice channel:', error);
+            console.error('❌ Erreur lors de la mise à jour du statut et du canal vocal :', error);
         }
     }
 
@@ -53,11 +53,11 @@ class StatusManager {
                     }],
                     status: 'online'
                 });
-                console.log(`🔄 Status refreshed: ${activity}`);
+                console.log(`🔄 Statut rafraîchi : ${activity}`);
             }
         }, 30000);
         
-        console.log(`✅ Status locked to: ${activity}`);
+        console.log(`✅ Statut verrouillé sur : ${activity}`);
     }
 
 
@@ -85,7 +85,7 @@ class StatusManager {
             const permissions = voiceChannel.permissionsFor(botMember);
             
             if (!permissions?.has('ManageChannels')) {
-                console.warn(`⚠️ Bot lacks 'Manage Channels' permission in ${voiceChannel.name}`);
+                console.warn(`⚠️ Le bot n\'a pas la permission 'Manage Channels' dans ${voiceChannel.name}`);
                 return;
             }
 
@@ -101,7 +101,7 @@ class StatusManager {
             await this.createChannelName(voiceChannel, trackTitle);
 
         } catch (error) {
-            console.error(`❌ Voice channel status creation failed: ${error.message}`);
+            console.error(`❌ Échec de la création du statut du canal vocal : ${error.message}`);
         }
     }
 
@@ -141,7 +141,7 @@ class StatusManager {
     
             const permissions = voiceChannel.permissionsFor(botMember);
             if (!permissions?.has('ManageChannels')) {
-                console.warn(`⚠️ Bot lacks 'Manage Channels' permission in ${voiceChannel.name}`);
+                console.warn(`⚠️ Le bot n’a pas la permission 'Manage Channels' dans ${voiceChannel.name}`);
                 return;
             }
 
@@ -155,7 +155,7 @@ class StatusManager {
             await this.deleteChannelName(voiceChannel);
 
         } catch (error) {
-            console.error(`❌ Voice channel status clearing failed: ${error.message}`);
+            console.error(`❌ Échec de la suppression du statut du canal vocal : ${error.message}`);
         }
     }
 
@@ -165,10 +165,10 @@ class StatusManager {
             await this.client.rest.put(`/channels/${channelId}/voice-status`, {
                 body: { status: statusText }
             });
-            console.log(`✅ Voice status created: ${statusText}`);
+            console.log(`✅ Statut vocal créé : ${statusText}`);
             return true;
         } catch (error) {
-            console.log(`ℹ️ Voice status API not available for creation`);
+            console.log(`ℹ️ API de statut vocal non disponible pour la création`);
             return false;
         }
     }
@@ -180,16 +180,17 @@ class StatusManager {
             await this.client.rest.put(`/channels/${channelId}/voice-status`, {
                 body: { status: null }
             });
-            console.log(`✅ Voice status cleared`);
+            console.log(`✅ Statut vocal effacé`);
             return true;
         } catch (error) {
             try {
              
+
                 await this.client.rest.delete(`/channels/${channelId}/voice-status`);
-                console.log(`✅ Voice status deleted`);
+                console.log(`✅ Statut vocal supprimé`);
                 return true;
             } catch (deleteError) {
-                console.log(`ℹ️ Voice status API not available for deletion`);
+                console.log(`ℹ️ API de statut vocal non disponible pour la suppression`);
                 return false;
             }
         }
@@ -198,12 +199,12 @@ class StatusManager {
 
     async createChannelTopic(voiceChannel, trackTitle) {
         try {
-            const topicText = `🎵 Now Playing: ${trackTitle}`;
+            const topicText = `🎵 Lecture : ${trackTitle}`;
             await voiceChannel.setTopic(topicText);
-            console.log(`✅ Voice channel topic created: ${topicText}`);
+            console.log(`✅ Topic du canal vocal créé : ${topicText}`);
             return true;
         } catch (error) {
-            console.log(`ℹ️ Channel topic creation failed: ${error.message}`);
+            console.log(`ℹ️ Échec de la création du topic du canal : ${error.message}`);
             return false;
         }
     }
@@ -215,10 +216,10 @@ class StatusManager {
             const originalTopic = originalData?.originalTopic || null;
             
             await voiceChannel.setTopic(originalTopic);
-            console.log(`✅ Voice channel topic restored`);
+            console.log(`✅ Topic du canal vocal restauré`);
             return true;
         } catch (error) {
-            console.log(`ℹ️ Channel topic restoration failed: ${error.message}`);
+            console.log(`ℹ️ Échec de la restauration du topic du canal : ${error.message}`);
             return false;
         }
     }
@@ -236,11 +237,11 @@ class StatusManager {
 
             if (newName !== voiceChannel.name && newName.length <= 100) {
                 await voiceChannel.setName(newName);
-                console.log(`✅ Voice channel name created: ${newName}`);
+                console.log(`✅ Nom du canal vocal modifié : ${newName}`);
             }
             return true;
         } catch (error) {
-            console.warn(`⚠️ Channel name creation failed: ${error.message}`);
+            console.warn(`⚠️ Échec de la modification du nom du canal : ${error.message}`);
             return false;
         }
     }
@@ -253,14 +254,14 @@ class StatusManager {
             
             if (originalName && originalName !== voiceChannel.name) {
                 await voiceChannel.setName(originalName);
-                console.log(`✅ Voice channel name restored: ${originalName}`);
+                console.log(`✅ Nom du canal restauré : ${originalName}`);
                 
          
                 this.voiceChannelData.delete(voiceChannel.id);
             }
             return true;
         } catch (error) {
-            console.warn(`⚠️ Channel name restoration failed: ${error.message}`);
+            console.warn(`⚠️ Échec de la restauration du nom du canal : ${error.message}`);
             return false;
         }
     }
@@ -270,7 +271,7 @@ class StatusManager {
         this.stopCurrentStatus();
         this.isPlaying = false;
         
-        const defaultActivity = `🎵 Ready for music!`;
+        const defaultActivity = `🎵 Prêt pour la musique !`;
         
         await this.client.user.setPresence({
             activities: [{
@@ -280,7 +281,7 @@ class StatusManager {
             status: 'online'
         });
         
-        console.log(`✅ Status reset to: ${defaultActivity}`);
+        console.log(`✅ Statut réinitialisé : ${defaultActivity}`);
     }
 
   
@@ -296,7 +297,7 @@ class StatusManager {
         if (!this.isPlaying) {
             await this.client.user.setPresence({
                 activities: [{
-                    name: `Je suis fonctinnel 24h/7j`,
+                    name: `Je suis fonctionnel 24h/7j`,
                     type: ActivityType.Playing
                 }],
                 status: 'online'
@@ -333,14 +334,14 @@ class StatusManager {
     }
 
 
-    async testVoiceChannelCRUD(guildId, testText = 'Test Song') {
-        console.log(`🧪 Testing Voice Channel CRUD for guild ${guildId}`);
+    async testVoiceChannelCRUD(guildId, testText = 'Chanson de test') {
+        console.log(`🧪 Test CRUD du canal vocal pour la guilde ${guildId}`);
         
         const results = [];
         
    
         await this.setVoiceChannelStatus(guildId, testText);
-        results.push('✅ CREATE: Status set');
+        results.push('✅ CRÉER : Statut défini');
         
         await new Promise(resolve => setTimeout(resolve, 3000)); 
         
@@ -350,16 +351,16 @@ class StatusManager {
             const guild = this.client.guilds.cache.get(guildId);
             const voiceChannel = guild?.channels.cache.get(player.voiceChannel);
             if (voiceChannel) {
-                results.push(`📖 READ: Channel name: ${voiceChannel.name}`);
-                results.push(`📖 READ: Channel topic: ${voiceChannel.topic || 'None'}`);
+                results.push(`📖 LIRE : Nom du canal : ${voiceChannel.name}`);
+                results.push(`📖 LIRE : Topic du canal : ${voiceChannel.topic || 'Aucun'}`);
             }
         }
         
         await new Promise(resolve => setTimeout(resolve, 2000)); 
         
-  
+
         await this.clearVoiceChannelStatus(guildId);
-        results.push('🗑️ DELETE: Status cleared');
+        results.push('🗑️ SUPPRIMER : Statut effacé');
         
         return results.join('\n');
     }
